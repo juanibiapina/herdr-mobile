@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=6, user-scalable=yes">
+<style>/*XTERM_CSS*/</style>
+<style>
+  html, body { margin: 0; padding: 0; background: #0d1117; height: 100%; overflow: hidden; }
+  #wrap { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+  #term { transform-origin: 0 0; }
+  body.fit #term { position: absolute; inset: 4px; }
+  .xterm .xterm-viewport { background: #0d1117 !important; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="term"></div></div>
+<script>/*XTERM_JS*/</script>
+<script>/*FIT_JS*/</script>
+<script>
+(function () {
+  var post = function (msg) { window.ReactNativeWebView.postMessage(JSON.stringify(msg)); };
+  var el = document.getElementById("term");
+  var term = new Terminal({
+    fontSize: 12,
+    fontFamily: "'Droid Sans Mono', NerdSymbols, monospace",
+    scrollback: 5000,
+    disableStdin: true,
+    cursorBlink: false,
+    allowProposedApi: true,
+    theme: { background: "#0d1117", foreground: "#e6edf3", cursor: "#e6edf3" },
+  });
+  var fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(el);
+
+  var mode = "view";
+  var size = { cols: 80, rows: 24 };
+
+  // View mode: the terminal keeps its own size, scaled to the screen width.
+  function scaleToWidth() {
+    var screen = el.querySelector(".xterm-screen");
+    if (!screen) return;
+    var w = screen.offsetWidth || 1;
+    var s = Math.min(1, window.innerWidth / w);
+    el.style.transform = "scale(" + s + ")";
+    el.style.width = w + "px";
+    document.getElementById("wrap").style.height = "100%";
+  }
+
+  function layout() {
+    if (mode === "fit") {
+      el.style.transform = "";
+      el.style.width = "";
+      fit.fit();
+      if (term.cols !== size.cols || term.rows !== size.rows) {
+        size = { cols: term.cols, rows: term.rows };
+        post({ type: "size", cols: term.cols, rows: term.rows });
+      }
+    } else {
+      term.resize(size.cols, size.rows);
+      scaleToWidth();
+    }
+  }
+
+  function bytes(b64) {
+    var s = atob(b64), out = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  window.hc = {
+    receive: function (msg) {
+      if (msg.type === "write") {
+        var data = bytes(msg.data);
+        term.write(data, function () { post({ type: "written", bytes: data.length }); });
+      } else if (msg.type === "reset") {
+        term.reset();
+      } else if (msg.type === "mode") {
+        mode = msg.mode;
+        document.body.className = mode;
+        if (msg.cols && msg.rows) size = { cols: msg.cols, rows: msg.rows };
+        layout();
+      } else if (msg.type === "size") {
+        if (mode === "view") { size = { cols: msg.cols, rows: msg.rows }; layout(); }
+      } else if (msg.type === "font") {
+        term.options.fontSize = msg.size;
+        layout();
+      } else if (msg.type === "bottom") {
+        term.scrollToBottom();
+      }
+    },
+  };
+
+  // Measure again once the icon font is in, so cells keep their width.
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load("12px NerdSymbols").then(function () { term.options.fontFamily = term.options.fontFamily; layout(); });
+  }
+
+  window.addEventListener("resize", layout);
+  post({ type: "ready" });
+})();
+</script>
+</body>
+</html>

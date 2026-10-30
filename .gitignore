@@ -1,0 +1,7 @@
+node_modules/
+.expo/
+android/
+ios/
+dist/
+*.apk
+src/terminal/terminal-html.generated.ts

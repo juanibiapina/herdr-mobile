@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Herdr",
+    "slug": "herdr-mobile",
+    "scheme": "herdrmobile",
+    "version": "0.2.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d1117",
+    "android": {
+      "package": "dev.juanibiapina.herdrmobile",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "INTERNET",
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE"
+      ],
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/foreground.png",
+        "backgroundImage": "./assets/background.png",
+        "monochromeImage": "./assets/monochrome.png",
+        "backgroundColor": "#0d1117"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "agents",
+          "icon": "./assets/monochrome.png",
+          "color": "#3fb950"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "icon": "./assets/icon.png"
+  }
+}
