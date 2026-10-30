@@ -20,14 +20,22 @@ type Props = {
   pid: number | null | undefined;
   mode: TerminalMode;
   fontSize: number;
+  /** A tap on the terminal: the screen opens the keyboard. */
+  onTap?: () => void;
 };
 
 export type TerminalHandle = {
-  /** Type raw bytes into the terminal. False when watching only (full size) or not attached. */
+  /** Type raw bytes into the terminal. False when not attached. */
   write: (bytes: Uint8Array) => boolean;
+  /** Whether the program asked for application cursor keys (arrows as ESC O A). */
+  appCursor: () => boolean;
+  /** Whether the program wants pastes wrapped (bracketed paste). */
+  bracketedPaste: () => boolean;
+  /** Back to the live screen, e.g. when typing after scrolling up. */
+  scrollToBottom: () => void;
 };
 
-export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalView({ conn, address, cols, rows, pid, mode, fontSize }, ref) {
+export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalView({ conn, address, cols, rows, pid, mode, fontSize, onTap }, ref) {
   const web = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   const [fitSize, setFitSize] = useState<{ cols: number; rows: number } | null>(null);
@@ -36,14 +44,19 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalV
   const stream = useRef<AttachStream | null>(null);
   const [ended, setEnded] = useState<string | null>(null);
   const pending = useRef<Uint8Array[]>([]);
+  const appCursor = useRef(false);
+  const bracketed = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useImperativeHandle(ref, () => ({
     write: (bytes) => {
-      if (mode !== "fit" || !stream.current) return false;
+      if (!stream.current) return false;
       stream.current.write(bytes);
       return true;
     },
+    appCursor: () => appCursor.current,
+    bracketedPaste: () => bracketed.current,
+    scrollToBottom: () => post({ type: "bottom" }),
   }));
 
   const post = (msg: object) =>
@@ -80,7 +93,10 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalV
   }, [ready, fontSize]);
 
   useEffect(() => {
-    if (ready && mode === "full") post({ type: "size", cols, rows });
+    if (mode !== "full") return;
+    // Typing makes this viewer the one that sets the size: keep it the terminal's own.
+    stream.current?.resize(cols, rows);
+    if (ready) post({ type: "size", cols, rows });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cols, rows]);
 
@@ -96,7 +112,7 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalV
     const size = mode === "fit" ? fitRef.current! : { cols, rows };
     conn
       .attach(
-        { terminal: address, cols: size.cols, rows: size.rows, observe: mode === "full", history: 2000 },
+        { terminal: address, cols: size.cols, rows: size.rows, history: 2000 },
         {
           onData: (bytes, s) => {
             if (cancelled) return;
@@ -130,6 +146,11 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalV
     const msg = JSON.parse(raw);
     if (msg.type === "ready") setReady(true);
     else if (msg.type === "written") stream.current?.ack(msg.bytes);
+    else if (msg.type === "modes") {
+      appCursor.current = !!msg.appCursor;
+      bracketed.current = !!msg.bracketedPaste;
+    }
+    else if (msg.type === "tap") onTap?.();
     else if (msg.type === "size") {
       setFitSize({ cols: msg.cols, rows: msg.rows });
       if (mode === "fit") stream.current?.resize(msg.cols, msg.rows);

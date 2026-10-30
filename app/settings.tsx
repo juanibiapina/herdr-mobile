@@ -33,6 +33,24 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <Text style={styles.section}>Typing</Text>
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Text style={styles.label}>Keyboard for typing in the terminal</Text>
+            <Text style={styles.hint}>
+              {s.directKeyboard === "literal"
+                ? "Literal: sends exactly the keys you press. The keyboard can't autocorrect commands."
+                : "Standard: swipe typing and suggestions, but the keyboard may correct words as you type."}
+            </Text>
+          </View>
+          <View style={styles.segment}>
+            <Seg label="Literal" active={s.directKeyboard === "literal"} onPress={() => void updateSettings({ directKeyboard: "literal" })} />
+            <Seg label="Standard" active={s.directKeyboard === "standard"} onPress={() => void updateSettings({ directKeyboard: "standard" })} />
+          </View>
+        </View>
+      </View>
+
       <Text style={styles.section}>Herdr desktop app</Text>
       <View style={styles.card}>
         <Toggle

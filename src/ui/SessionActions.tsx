@@ -75,6 +75,17 @@ export function SessionActions({ session, onClose }: { session: Session | null; 
               })}
             />
           )}
+          <SheetAction
+            label="Copy output"
+            detail="The screen and up to 1000 lines of history"
+            onPress={run(async () => {
+              const r = await call("terminal.read", { lines: 1000 });
+              if (typeof r?.text !== "string") return;
+              // Drop the screen's empty rows and trailing spaces.
+              const text = r.text.split("\n").map((l: string) => l.trimEnd()).join("\n").replace(/^\n+|\n+$/g, "");
+              await Clipboard.setStringAsync(text + "\n");
+            })}
+          />
           <SheetAction label="Copy address" detail={`${session.machine}/${session.address.split("/").pop()}`} onPress={run(() => Clipboard.setStringAsync(session.address))} />
           {live ? (
             <SheetAction

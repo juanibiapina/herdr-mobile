@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -6,7 +7,8 @@ import { fleet, useFleet } from "../../src/fleet-store";
 import { utf8Encode } from "../../src/hc/bytes";
 import { HcError } from "../../src/hc/connection";
 import { setViewingSession } from "../../src/notifications";
-import { useSettings } from "../../src/settings";
+import { updateSettings, useSettings } from "../../src/settings";
+import { keyBytes } from "../../src/terminal/keys";
 import { TerminalView, type TerminalHandle, type TerminalMode } from "../../src/terminal/TerminalView";
 import { AgentList } from "../../src/ui/AgentList";
 import { SessionActions } from "../../src/ui/SessionActions";
@@ -16,25 +18,30 @@ import { sessionOrder, sessionTitle, statusColor, waitingOnYou } from "../../src
 import { useKeyboardHeight } from "../../src/ui/keyboard";
 import { colors } from "../../src/ui/theme";
 
-const KEYS: { label: string; keys: string[] }[] = [
-  { label: "esc", keys: ["esc"] },
-  { label: "⏎", keys: ["enter"] },
-  { label: "↑", keys: ["up"] },
-  { label: "↓", keys: ["down"] },
-  { label: "←", keys: ["left"] },
-  { label: "→", keys: ["right"] },
-  { label: "tab", keys: ["tab"] },
-  { label: "⇧tab", keys: ["shift+tab"] },
-  { label: "^C", keys: ["ctrl+c"] },
-  { label: "^D", keys: ["ctrl+d"] },
-  { label: "^R", keys: ["ctrl+r"] },
-  { label: "1", keys: ["1"] },
-  { label: "2", keys: ["2"] },
-  { label: "3", keys: ["3"] },
-  { label: "y", keys: ["y"] },
-  { label: "n", keys: ["n"] },
-  { label: "PgUp", keys: ["pageup"] },
-  { label: "PgDn", keys: ["pagedown"] },
+const KEYS: { label: string; key: string }[] = [
+  { label: "esc", key: "esc" },
+  { label: "tab", key: "tab" },
+  { label: "↑", key: "up" },
+  { label: "↓", key: "down" },
+  { label: "←", key: "left" },
+  { label: "→", key: "right" },
+  { label: "⏎", key: "enter" },
+  { label: "^C", key: "ctrl+c" },
+  { label: "paste", key: "paste" },
+  { label: "⇧tab", key: "shift+tab" },
+  { label: "^D", key: "ctrl+d" },
+  { label: "^R", key: "ctrl+r" },
+  { label: "^L", key: "ctrl+l" },
+  { label: "^Z", key: "ctrl+z" },
+  { label: "1", key: "1" },
+  { label: "2", key: "2" },
+  { label: "3", key: "3" },
+  { label: "y", key: "y" },
+  { label: "n", key: "n" },
+  { label: "home", key: "home" },
+  { label: "end", key: "end" },
+  { label: "PgUp", key: "pageup" },
+  { label: "PgDn", key: "pagedown" },
 ];
 
 export default function SessionScreen() {
@@ -45,10 +52,10 @@ export default function SessionScreen() {
   const session = route?.session;
   const t = session?.terminal;
   const live = t?.state === "live";
-  const [mode, setMode] = useState<TerminalMode>(settings.defaultMode);
+  const [view, setView] = useState<TerminalMode>(settings.defaultMode);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [typing, setTyping] = useState(false);
+  const message = settings.inputMode === "message";
   const [ctrl, setCtrl] = useState(false);
   const [actions, setActions] = useState(false);
   const [switcher, setSwitcher] = useState(false);
@@ -72,12 +79,11 @@ export default function SessionScreen() {
 
   useEffect(() => {
     setText("");
-    setTyping(false);
     setCtrl(false);
+    resetMirror();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const terminal = useRef<TerminalHandle>(null);
-  const raw = useRef<TextInput>(null);
-  const rawText = useRef("");
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardHeight();
 
@@ -88,9 +94,20 @@ export default function SessionScreen() {
 
   const fail = (e: unknown) => Alert.alert("Could not reach it", e instanceof Error ? e.message : String(e));
 
-  const pressKeys = (keys: string[]) => {
-    if (!route) return;
-    route.conn.call("terminal.keys", { terminal: route.address, keys }).catch(fail);
+  // Raw bytes on the attach stream: instant, and hc's "someone is typing" hold
+  // doesn't apply to them. Named keys through hc only when not attached yet.
+  const pressKey = (name: string) => {
+    resetMirror();
+    terminal.current?.scrollToBottom();
+    if (name === "paste") return void paste();
+    if (ctrl && name.length === 1) {
+      setCtrl(false);
+      name = `ctrl+${name}`;
+    }
+    const bytes = utf8Encode(keyBytes(name, terminal.current?.appCursor() ?? false));
+    if (!terminal.current?.write(bytes) && route) {
+      route.conn.call("terminal.keys", { terminal: route.address, keys: [name] }).catch(fail);
+    }
   };
 
   const send = async (force = false) => {
@@ -111,49 +128,73 @@ export default function SessionScreen() {
     }
   };
 
-  // Direct typing: every change goes to the terminal as bytes.
+  // Direct typing: a hidden field takes the keyboard; what changes in it goes to
+  // the terminal as bytes (new text as typed, removed text as backspaces).
   const typeRaw = (chars: string) => {
     if (!chars) return;
-    let bytes: Uint8Array;
-    if (ctrl && chars.length === 1) {
-      const c = chars.toLowerCase().charCodeAt(0);
-      bytes = new Uint8Array([c >= 0x60 && c < 0x80 ? c & 0x1f : c]);
+    let out = chars.replace(/\n/g, "\r");
+    if (ctrl && out.length === 1 && /[a-z@\[\]\\^_ ]/i.test(out)) {
+      const c = out.toLowerCase().charCodeAt(0);
+      out = String.fromCharCode(c === 0x20 ? 0 : c & 0x1f);
       setCtrl(false);
-    } else {
-      bytes = utf8Encode(chars.replace(/\n/g, "\r"));
     }
-    if (!terminal.current?.write(bytes)) {
-      // Not attached for typing yet: press them as named keys instead.
-      const names = [...chars].map((c) => ({ " ": "space", "\x7f": "backspace", "\r": "enter", "\n": "enter" })[c] ?? c);
-      if (route) route.conn.call("terminal.keys", { terminal: route.address, keys: names }).catch(fail);
+    const bytes = utf8Encode(out);
+    terminal.current?.scrollToBottom();
+    if (!terminal.current?.write(bytes) && route) {
+      const names = [...out].map((c) => ({ " ": "space", "\x7f": "backspace", "\r": "enter" })[c] ?? c);
+      route.conn.call("terminal.keys", { terminal: route.address, keys: names }).catch(fail);
     }
   };
 
-  // The field keeps what was typed; send only what changed since last time.
-  const onRawChange = (next: string) => {
-    const prev = rawText.current;
-    rawText.current = next;
+  // The clipboard as one paste: wrapped when the program asked for bracketed paste,
+  // so a multi-line paste doesn't run line by line.
+  const paste = async () => {
+    const text = (await Clipboard.getStringAsync()).replace(/\r?\n/g, "\r");
+    if (!text) return;
+    const wrapped = terminal.current?.bracketedPaste() ? `\x1b[200~${text}\x1b[201~` : text;
+    if (!terminal.current?.write(utf8Encode(wrapped)) && route) {
+      route.conn.call("terminal.send", { terminal: route.address, text }).catch(fail);
+    }
+  };
+
+  const capture = useRef<TextInput>(null);
+  const mirror = useRef("");
+  const resetMirror = () => {
+    mirror.current = "";
+    capture.current?.clear();
+  };
+
+  const onCaptureChange = (next: string) => {
+    const prev = mirror.current;
+    mirror.current = next;
     let common = 0;
     while (common < prev.length && common < next.length && prev[common] === next[common]) common++;
     const erase = prev.length - common;
     if (erase > 0) typeRaw("\x7f".repeat(erase));
     const added = next.slice(common);
     if (added) typeRaw(added);
+    // Enter arrives as a newline (the field is multiline so the keyboard stays
+    // open): the line went to the terminal, so start the mirror over.
+    if (added.includes("\n")) resetMirror();
   };
 
-  const onRawSubmit = () => {
-    typeRaw("\r");
-    rawText.current = "";
-    raw.current?.clear();
+  // Android keeps a hidden field focused after the keyboard is dismissed; blur
+  // first so focusing opens the keyboard again.
+  const openKeyboard = () => {
+    if (message) return;
+    const input = capture.current;
+    if (!input) return;
+    if (input.isFocused()) {
+      input.blur();
+      setTimeout(() => input.focus(), 60);
+    } else input.focus();
   };
 
-  const toggleTyping = () => {
-    rawText.current = "";
-    setTyping((on) => {
-      if (!on) setMode("fit");
-      return !on;
-    });
+  const setMode = (next: "direct" | "message") => {
+    resetMirror();
     setCtrl(false);
+    void updateSettings({ inputMode: next });
+    if (next === "direct") setTimeout(openKeyboard, 80);
   };
 
   return (
@@ -177,12 +218,9 @@ export default function SessionScreen() {
               )}
               <Pressable
                 hitSlop={10}
-                onPress={() => {
-                  setMode((m) => (m === "fit" ? "full" : "fit"));
-                  setTyping(false);
-                }}
+                onPress={() => setView((m) => (m === "fit" ? "full" : "fit"))}
               >
-                <Text style={styles.headerButton}>{mode === "fit" ? "Full" : "Fit"}</Text>
+                <Text style={styles.headerButton}>{view === "fit" ? "Full" : "Fit"}</Text>
               </Pressable>
               <Pressable hitSlop={10} onPress={() => setActions(true)} disabled={!session}>
                 <Text style={styles.headerMenu}>⋯</Text>
@@ -209,8 +247,9 @@ export default function SessionScreen() {
           cols={t.cols}
           rows={t.rows}
           pid={t.pid}
-          mode={mode}
+          mode={view}
           fontSize={settings.fontSize}
+          onTap={openKeyboard}
         />
       ) : (
         <View style={styles.gone}>
@@ -220,47 +259,48 @@ export default function SessionScreen() {
       {live && (
         <>
           <ScrollView horizontal style={styles.keybar} contentContainerStyle={styles.keybarContent} keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false}>
-            <KeyButton label={typing ? "✉ Message" : "⌨ Type"} active={typing} onPress={toggleTyping} />
-            {typing && <KeyButton label="ctrl" active={ctrl} onPress={() => setCtrl((c) => !c)} />}
+            <KeyButton label={message ? "⌨" : "✉"} onPress={() => setMode(message ? "direct" : "message")} />
+            {!message && keyboard === 0 && <KeyButton label="keyboard" onPress={openKeyboard} />}
+            <KeyButton label="ctrl" active={ctrl} onPress={() => setCtrl((c) => !c)} />
             {KEYS.map((k) => (
-              <KeyButton key={k.label} label={k.label} onPress={() => pressKeys(k.keys)} />
+              <KeyButton key={k.label} label={k.label} onPress={() => pressKey(k.key)} />
             ))}
           </ScrollView>
-          <View style={[styles.composer, { paddingBottom: keyboard ? 8 : Math.max(insets.bottom, 8) }]}>
-            {typing ? (
+          {message ? (
+            <View style={[styles.composer, { paddingBottom: keyboard ? 8 : Math.max(insets.bottom, 8) }]}>
               <TextInput
-                key="raw"
-                ref={raw}
-                style={[styles.input, styles.rawInput]}
-                autoFocus
-                onChangeText={onRawChange}
-                onKeyPress={(e) => e.nativeEvent.key === "Backspace" && rawText.current === "" && typeRaw("\x7f")}
-                onSubmitEditing={onRawSubmit}
-                submitBehavior="submit"
-                placeholder={ctrl ? "ctrl + next key" : "Keys go straight to the terminal"}
-                placeholderTextColor={ctrl ? colors.working : colors.muted}
+                key="message"
+                style={styles.input}
+                value={text}
+                onChangeText={setText}
+                placeholder="Message"
+                placeholderTextColor={colors.muted}
+                multiline
+              />
+              <Pressable style={[styles.send, (!text.trim() || sending) && { opacity: 0.4 }]} disabled={!text.trim() || sending} onPress={() => void send()}>
+                <Text style={styles.sendText}>{sending ? "…" : "Send"}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={{ height: keyboard ? 0 : Math.max(insets.bottom, 4) }}>
+              <TextInput
+                key={settings.directKeyboard}
+                ref={capture}
+                style={styles.capture}
+                keyboardType={settings.directKeyboard === "literal" ? "visible-password" : "default"}
+                defaultValue=""
+                onChangeText={onCaptureChange}
+                onKeyPress={(e) => e.nativeEvent.key === "Backspace" && mirror.current === "" && typeRaw("\x7f")}
+                multiline
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="off"
-                keyboardType="visible-password"
+                spellCheck={false}
+                importantForAutofill="no"
+                caretHidden
               />
-            ) : (
-              <>
-                <TextInput
-                  key="message"
-                  style={styles.input}
-                  value={text}
-                  onChangeText={setText}
-                  placeholder="Message"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                />
-                <Pressable style={[styles.send, (!text.trim() || sending) && { opacity: 0.4 }]} disabled={!text.trim() || sending} onPress={() => void send()}>
-                  <Text style={styles.sendText}>Send</Text>
-                </Pressable>
-              </>
-            )}
-          </View>
+            </View>
+          )}
         </>
       )}
       {!live && t && <View style={{ height: Math.max(insets.bottom, 8) }} />}
@@ -308,7 +348,7 @@ const styles = StyleSheet.create({
   keyTextActive: { color: "#0d1117", fontWeight: "700" },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 8, paddingTop: 8, backgroundColor: colors.surface },
   input: { flex: 1, maxHeight: 120, color: colors.text, backgroundColor: colors.bg, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8, fontSize: 15 },
-  rawInput: { fontFamily: "monospace" },
+  capture: { position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0, color: "transparent" },
   send: { backgroundColor: colors.accent, borderRadius: 18, paddingHorizontal: 16, height: 36, justifyContent: "center" },
   sendText: { color: "#0d1117", fontWeight: "700" },
 });
