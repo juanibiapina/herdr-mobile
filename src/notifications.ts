@@ -27,14 +27,36 @@ export async function startNotifications() {
     name: "Agents",
     importance: Notifications.AndroidImportance.HIGH,
   });
+  // Answer an agent from the notification, without opening the app.
+  await Notifications.setNotificationCategoryAsync("agent", [
+    {
+      identifier: "reply",
+      buttonTitle: "Reply",
+      textInput: { submitButtonTitle: "Send", placeholder: "Message to the agent" },
+      options: { opensAppToForeground: false },
+    },
+  ]);
   await Notifications.requestPermissionsAsync();
 
-  Notifications.addNotificationResponseReceivedListener((r) => {
-    const key = r.notification.request.content.data?.key;
-    if (typeof key === "string") router.push({ pathname: "/session/[key]", params: { key } });
-  });
+  Notifications.addNotificationResponseReceivedListener((r) => void respond(r));
 
   fleet.onTransition((t) => void notify(t));
+}
+
+async function respond(r: Notifications.NotificationResponse) {
+  const key = r.notification.request.content.data?.key;
+  if (typeof key !== "string") return;
+  if (r.actionIdentifier === "reply") {
+    const text = r.userText?.trim();
+    const route = fleet.route(key);
+    if (text && route) {
+      // An explicit answer: deliver it even if the agent is blocked on a question.
+      await route.conn.call("terminal.send", { terminal: route.address, text, force: true }).catch(() => {});
+    }
+    await Notifications.dismissNotificationAsync(r.notification.request.identifier);
+    return;
+  }
+  router.push({ pathname: "/session/[key]", params: { key } });
 }
 
 async function notify({ session, kind }: Transition) {
@@ -55,6 +77,7 @@ async function notify({ session, kind }: Transition) {
       title: `${sessionTitle(session)} · ${session.machine}`,
       body,
       data: { key: session.key },
+      categoryIdentifier: kind === "exited" ? undefined : "agent",
     },
     trigger: { channelId: "agents" } as Notifications.NotificationTriggerInput,
   });
