@@ -2,7 +2,7 @@
 // are already looking at it.
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import type { Transition } from "./hc/fleet";
 import { fleet } from "./fleet-store";
 import { getSettings } from "./settings";
@@ -23,10 +23,12 @@ Notifications.setNotificationHandler({
 });
 
 export async function startNotifications() {
-  await Notifications.setNotificationChannelAsync("agents", {
-    name: "Agents",
-    importance: Notifications.AndroidImportance.HIGH,
-  });
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("agents", {
+      name: "Agents",
+      importance: Notifications.AndroidImportance.HIGH,
+    });
+  }
   // Answer an agent from the notification, without opening the app.
   await Notifications.setNotificationCategoryAsync("agent", [
     {

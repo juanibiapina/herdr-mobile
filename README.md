@@ -1,6 +1,6 @@
 # Herdr Mobile
 
-An Android client for [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`).
+An Android and iOS client for [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`).
 
 - **Agents:** every session on your machines, grouped the way Herdr's Agents
   panel groups them: what needs you, what is idle waiting for your next
@@ -48,7 +48,8 @@ scratch state directories, so they never see your terminals.
 Layout:
 
 - `src/hc/`: the hc protocol client (`connection.ts`) and the merged view of all machines (`fleet.ts`). No React Native imports, so the tests run in Node.
-- `modules/hc-ssh/`: the native SSH module (Kotlin, JSch + BouncyCastle).
+- `modules/hc-ssh/`: the native SSH module (Kotlin, JSch + BouncyCastle, on Android; Swift, SwiftNIO SSH, on iOS).
+- `plugins/with-ios-scene.js`: adopts the UIScene life cycle, which iOS 27 requires and Expo's template lacks.
 - `src/terminal/`: xterm.js in a WebView, fed by hc's attach stream.
 - `app/`: screens (Expo Router).
 
@@ -83,3 +84,20 @@ The script expects a NixOS box with the Android dev shell from
 `juanibiapina/dotfiles` (`nix develop ~/workspace/juanibiapina/dotfiles#android`).
 It limits Gradle to one worker and one JVM for low-memory machines. The release
 build is signed with the debug key.
+
+### iOS
+
+For installing on your own iPhone (no App Store):
+
+```sh
+npx expo prebuild --platform ios
+npx expo run:ios --device --configuration Release
+```
+
+The first run asks Xcode to sign: open `ios/Herdr.xcworkspace`, pick your team under
+Signing & Capabilities, and trust the developer profile on the phone
+(Settings → General → VPN & Device Management). A free personal team's install
+expires after 7 days; run it again to renew.
+
+iOS suspends the app's connections when it is in the background, so there is no
+background watching: machines reconnect when you reopen the app.
