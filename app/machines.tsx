@@ -6,6 +6,7 @@ import type { MachineConfig } from "../src/hc/fleet";
 import { phonePublicKey } from "../src/ssh/ssh-transport";
 import { hostKeys } from "../src/storage";
 import { useKeyboardHeight } from "../src/ui/keyboard";
+import { explainError } from "../src/ui/connection-error";
 import { colors } from "../src/ui/theme";
 
 export default function Machines() {
@@ -54,7 +55,7 @@ export default function Machines() {
                 {l.machines.length > 0 ? ` · sees ${l.machines.map((x) => `${x.name} (${x.state})`).join(", ")}` : ""}
               </Text>
             )}
-            {l.state !== "connected" && l.error && <Text style={styles.error}>{l.error}</Text>}
+            {l.state !== "connected" && l.error && <Text style={styles.error}>{explainError(l.error, m)}</Text>}
             {keyChanged && (
               <Pressable style={styles.secondary} onPress={() => void trustNewKey(m)}>
                 <Text style={styles.secondaryText}>Trust its new host key</Text>

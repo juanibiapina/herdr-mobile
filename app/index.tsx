@@ -7,6 +7,7 @@ import type { Session } from "../src/hc/fleet";
 import { AgentList } from "../src/ui/AgentList";
 import { SessionActions } from "../src/ui/SessionActions";
 import { ago, matches, sessionTitle } from "../src/ui/session-display";
+import { explainError } from "../src/ui/connection-error";
 import { colors } from "../src/ui/theme";
 import { applyUpdate, useUpdates } from "../src/updates";
 
@@ -96,7 +97,7 @@ export default function Agents() {
             <Pressable style={styles.banner}>
               <View style={[styles.bannerDot, { backgroundColor: l.state === "connecting" ? colors.working : colors.blocked }]} />
               <Text style={styles.bannerText} numberOfLines={2}>
-                {l.config.name}: {l.state === "connecting" ? "connecting…" : l.error || "offline"}
+                {l.config.name}: {l.state === "connecting" ? "connecting…" : explainError(l.error, l.config) || "offline"}
               </Text>
             </Pressable>
           </Link>

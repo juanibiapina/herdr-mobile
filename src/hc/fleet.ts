@@ -132,6 +132,23 @@ class Link {
     this.conn?.close();
   }
 
+  /**
+   * After the phone sleeps, a line can look open while the network under it is
+   * gone; SSH keepalives would notice only after ~45 s. Ask the core directly,
+   * and start over at once when it doesn't answer.
+   */
+  async probe(timeoutMs = 4000) {
+    const conn = this.conn;
+    if (!conn || this.state !== "connected") return void this.connect();
+    try {
+      await conn.call("server.status", {}, timeoutMs);
+    } catch {
+      if (this.conn !== conn) return;
+      this.retryMs = 500;
+      conn.close();
+    }
+  }
+
   private lost(reason: string) {
     this.conn = undefined;
     this.terminals.clear();
@@ -245,9 +262,14 @@ export class Fleet {
     this.changed();
   }
 
-  /** Retry offline machines now (e.g. when the app returns to the foreground). */
+  /** Retry offline machines now. */
   reconnect() {
     for (const link of this.links.values()) void link.connect();
+  }
+
+  /** Check every line (e.g. when the app returns to the foreground) and reconnect dead ones. */
+  probe() {
+    for (const link of this.links.values()) void link.probe();
   }
 
   stop() {

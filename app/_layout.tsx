@@ -17,7 +17,7 @@ export default function Layout() {
     void startNotifications();
     startBackgroundWatching();
     startUpdateChecks();
-    const sub = AppState.addEventListener("change", (s) => s === "active" && fleet.reconnect());
+    const sub = AppState.addEventListener("change", (s) => s === "active" && fleet.probe());
     return () => sub.remove();
   }, []);
 

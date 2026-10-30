@@ -152,3 +152,31 @@ test("sessions started from the phone land in the Herdr app's space for their fo
   const s = await until(() => fleet.snapshot().sessions.find((x) => x.key === key));
   expect(s.terminal.labels["herdr.space"]).toBe("sp_tmp");
 }, 30_000);
+
+test("a line that went silent while the phone slept is noticed and replaced", async () => {
+  let blackHole = false;
+  let opened = 0;
+  const flaky = async (c: MachineConfig) => {
+    opened++;
+    const real = hcProcessTransport({ ...base, HC_SESSION: c.host });
+    // Once the network "goes away", nothing gets through, and nothing closes.
+    return {
+      send: (b: Uint8Array) => !blackHole && real.send(b),
+      close: () => real.close(),
+      listen: (onData: (b: Uint8Array) => void, onClose: (r: string | null) => void) =>
+        real.listen((b) => !blackHole && onData(b), onClose),
+    };
+  };
+  const fleet = new Fleet(flaky);
+  fleets.push(fleet);
+  fleet.setMachines([B]);
+  await until(() => fleet.snapshot().links[0].state === "connected");
+  expect(opened).toBe(1);
+
+  blackHole = true;
+  fleet.probe();
+  await until(() => fleet.snapshot().links[0].state !== "connected", 8000);
+  blackHole = false;
+  await until(() => fleet.snapshot().links[0].state === "connected", 8000);
+  expect(opened).toBe(2);
+}, 30_000);
