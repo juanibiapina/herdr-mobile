@@ -8,6 +8,7 @@ import { AgentList } from "../src/ui/AgentList";
 import { SessionActions } from "../src/ui/SessionActions";
 import { ago, matches, sessionTitle } from "../src/ui/session-display";
 import { colors } from "../src/ui/theme";
+import { applyUpdate, useUpdates } from "../src/updates";
 
 export default function Agents() {
   const { links, sessions } = useFleet();
@@ -16,6 +17,7 @@ export default function Agents() {
   const [showFinished, setShowFinished] = useState(false);
   const [menu, setMenu] = useState<Session | null>(null);
   const insets = useSafeAreaInsets();
+  const { isUpdatePending } = useUpdates();
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 15_000);
@@ -80,6 +82,13 @@ export default function Agents() {
               </Pressable>
             </Link>
           </View>
+        )}
+
+        {isUpdatePending && (
+          <Pressable style={styles.update} onPress={() => void applyUpdate()}>
+            <Text style={styles.updateText}>A new version is ready</Text>
+            <Text style={styles.updateAction}>Restart</Text>
+          </Pressable>
         )}
 
         {offline.map((l) => (
@@ -167,6 +176,9 @@ const styles = StyleSheet.create({
   clear: { color: colors.blocked, fontSize: 14 },
   finishedRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 10 },
   finishedName: { flex: 1, color: colors.muted, fontFamily: "monospace", fontSize: 14 },
+  update: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.accent + "22", borderColor: colors.accent, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 10 },
+  updateText: { color: colors.text, fontSize: 14 },
+  updateAction: { color: colors.accent, fontSize: 14, fontWeight: "700" },
   banner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 10, marginBottom: 10 },
   bannerDot: { width: 8, height: 8, borderRadius: 4 },
   bannerText: { color: colors.text, fontSize: 13, flex: 1 },

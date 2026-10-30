@@ -7,6 +7,7 @@ import { fleet, startFleet } from "../src/fleet-store";
 import { startBackgroundWatching } from "../src/background";
 import { startNotifications } from "../src/notifications";
 import { loadSettings } from "../src/settings";
+import { startUpdateChecks } from "../src/updates";
 import { colors } from "../src/ui/theme";
 
 export default function Layout() {
@@ -15,6 +16,7 @@ export default function Layout() {
     void startFleet();
     void startNotifications();
     startBackgroundWatching();
+    startUpdateChecks();
     const sub = AppState.addEventListener("change", (s) => s === "active" && fleet.reconnect());
     return () => sub.remove();
   }, []);
