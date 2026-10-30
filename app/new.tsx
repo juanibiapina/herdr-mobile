@@ -5,6 +5,8 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Te
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fleet, useFleet } from "../src/fleet-store";
 import type { RunSpec, Target } from "../src/hc/fleet";
+import { herdrLabels } from "../src/herdr-app";
+import { getSettings } from "../src/settings";
 import { shortPath } from "../src/ui/session-display";
 import { useKeyboardHeight } from "../src/ui/keyboard";
 import { colors } from "../src/ui/theme";
@@ -147,7 +149,8 @@ export default function NewSession() {
     if (!target || !resolved) return;
     setStarting(true);
     try {
-      const key = await fleet.run(target, spec);
+      const labels = getSettings().showInHerdr ? await herdrLabels(fleet, target, resolved) : undefined;
+      const key = await fleet.run(target, { ...spec, labels });
       const all = await recentFolders();
       all[target.coreId] = [resolved, ...(all[target.coreId] ?? []).filter((p) => p !== resolved)].slice(0, 8);
       await AsyncStorage.multiSet([

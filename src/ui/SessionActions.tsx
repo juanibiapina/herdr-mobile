@@ -3,6 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { fleet } from "../fleet-store";
+import { herdrLabels } from "../herdr-app";
 import type { Session } from "../hc/fleet";
 import { ago, sessionTitle, shortPath } from "./session-display";
 import { Sheet, SheetAction } from "./Sheet";
@@ -61,6 +62,17 @@ export function SessionActions({ session, onClose }: { session: Session | null; 
               label={t.keep ? "Stop keeping it" : "Keep it alive"}
               detail={t.keep ? "If its program is lost, the terminal ends" : "If its program is lost, a shell takes its place"}
               onPress={run(() => call("terminal.keep", { keep: !t.keep }))}
+            />
+          )}
+          {live && !t.labels?.["herdr.space"] && (
+            <SheetAction
+              label="Show in Herdr desktop app"
+              detail="Give it a tab in the space for its folder"
+              onPress={run(async () => {
+                const target = fleet.targetOf(session.key);
+                if (!target) return Alert.alert("Not connected", "This session's machine is offline.");
+                await call("terminal.label", { labels: await herdrLabels(fleet, target, t.foreground?.cwd || t.cwd) });
+              })}
             />
           )}
           <SheetAction label="Copy address" detail={`${session.machine}/${session.address.split("/").pop()}`} onPress={run(() => Clipboard.setStringAsync(session.address))} />

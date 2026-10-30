@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { utf8Decode } from "../src/hc/bytes";
 import { Fleet, type MachineConfig, type Transition } from "../src/hc/fleet";
+import { herdrLabels } from "../src/herdr-app";
 import { hcProcessTransport } from "./node-transport";
 
 const scratch = mkdtempSync(join(tmpdir(), "hm-fleet-"));
@@ -129,3 +130,25 @@ test("starts sessions anywhere it reaches, nests children, and keeps finished on
   await again.route(key)!.conn.call("terminal.rm", { terminal: again.route(key)!.address });
   await until(() => !again.snapshot().sessions.some((x) => x.key === key));
 }, 40_000);
+
+test("sessions started from the phone land in the Herdr app's space for their folder", async () => {
+  const fleet = new Fleet(open);
+  fleets.push(fleet);
+  fleet.setMachines([A]);
+  const b = await until(() => fleet.targets().find((x) => x.on === "b"));
+
+  // B's layout, as the Herdr app keeps it in B's core.
+  const conn = (fleet as any).links.get("a").conn;
+  const layout = { spaces: [{ id: "sp_tmp", folder: "/tmp", tabs: [] }, { id: "sp_root", folder: "/", tabs: [] }] };
+  const current = await conn.call("doc.get", { name: "herdr-app", on: "b" });
+  await conn.call("doc.set", { name: "herdr-app", value: layout, version: current.version, on: "b" });
+
+  const labels = await herdrLabels(fleet, b, "/tmp/project");
+  expect(labels["herdr.space"]).toBe("sp_tmp");
+  expect(labels["herdr.tab"]).toMatch(/^tb[0-9a-f]{32}$/);
+  expect((await herdrLabels(fleet, b, "/elsewhere"))["herdr.space"]).toBe("sp_root");
+
+  const key = await fleet.run(b, { argv: ["cat"], cwd: "/tmp", labels });
+  const s = await until(() => fleet.snapshot().sessions.find((x) => x.key === key));
+  expect(s.terminal.labels["herdr.space"]).toBe("sp_tmp");
+}, 30_000);
