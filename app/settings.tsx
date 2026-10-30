@@ -33,6 +33,16 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <Text style={styles.section}>Herdr desktop app</Text>
+      <View style={styles.card}>
+        <Toggle
+          k="showInHerdr"
+          label="Show new sessions there"
+          hint="Sessions you start here get a tab in Herdr, in the space for their folder."
+          s={s}
+        />
+      </View>
+
       <Text style={styles.section}>Notify me when an agent</Text>
       <View style={styles.card}>
         <Toggle k="notifyBlocked" label="Needs me" hint="It is blocked on a question or permission, or reports an error" s={s} />
