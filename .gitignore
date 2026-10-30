@@ -5,3 +5,5 @@ node_modules/
 dist/
 *.apk
 src/terminal/terminal-html.generated.ts
+modules/*/android/build/
+modules/*/android/.cxx/
