@@ -8,9 +8,11 @@ An Android client for [herdr-core](https://github.com/herdrdev/herdr-core) (`hc`
 - **Switching:** inside a session, a strip of every session across the top,
   a "waiting" button that jumps to the next agent waiting on you, and the full
   list from the title.
-- **Terminal:** live, in color, at phone size or your desktop's size. Send a
-  message (hc pastes it and presses Enter), press keys from the key bar, or
-  type straight into the terminal with a sticky ctrl.
+- **Terminal:** live, in color, at phone size or your desktop's size. Tap it
+  and type: keys go straight to the terminal, exactly as pressed (no
+  autocorrect, unless you pick the standard keyboard in Settings). The key bar
+  sends esc, tab, arrows, ctrl combinations and the clipboard instantly.
+  Message mode is for prose to agents: hc pastes it and presses Enter.
 - **Start sessions:** pick a machine (also one reached through another), browse
   to a folder, and start a shell, an installed agent (Claude Code, pi, Codex, …),
   a template, or any command, with an optional first task.

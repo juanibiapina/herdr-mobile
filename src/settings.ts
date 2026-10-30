@@ -12,6 +12,10 @@ export type Settings = {
   background: boolean;
   /** Label new sessions so the Herdr desktop app shows them. */
   showInHerdr: boolean;
+  /** How the bottom bar takes input: keys straight to the terminal, or a message hc pastes. */
+  inputMode: "direct" | "message";
+  /** Direct typing: "literal" sends exactly the keys pressed (no autocorrect); "standard" keeps swipe and suggestions. */
+  directKeyboard: "literal" | "standard";
 };
 
 const DEFAULTS: Settings = {
@@ -22,6 +26,8 @@ const DEFAULTS: Settings = {
   notifyExit: true,
   background: true,
   showInHerdr: true,
+  inputMode: "direct",
+  directKeyboard: "literal",
 };
 const KEY = "settings.v1";
 

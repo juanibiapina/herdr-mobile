@@ -33,7 +33,46 @@
   term.loadAddon(fit);
   term.open(el);
 
+  // The app takes keyboard input in its own field; keep xterm's hidden textarea
+  // from grabbing focus and the keyboard on a tap.
+  var ta = term.textarea;
+  if (ta) {
+    ta.readOnly = true;
+    ta.setAttribute("inputmode", "none");
+    ta.setAttribute("tabindex", "-1");
+    ta.addEventListener("focus", function () { ta.blur(); });
+  }
+
   var mode = "view";
+  var appCursor = false;
+  var bracketed = false;
+
+  // Report the cursor-key mode so the key bar sends the arrows the program expects.
+  function checkModes() {
+    var cur = !!(term.modes && term.modes.applicationCursorKeysMode);
+    var bp = !!(term.modes && term.modes.bracketedPasteMode);
+    if (cur !== appCursor || bp !== bracketed) {
+      appCursor = cur;
+      bracketed = bp;
+      post({ type: "modes", appCursor: cur, bracketedPaste: bp });
+    }
+  }
+
+  // A tap (not a scroll or a long press) asks for the keyboard.
+  var touch = null;
+  document.addEventListener("touchstart", function (e) {
+    if (e.touches.length !== 1) { touch = null; return; }
+    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!touch) return;
+    var dx = e.touches[0].clientX - touch.x, dy = e.touches[0].clientY - touch.y;
+    if (dx * dx + dy * dy > 100) touch = null;
+  }, { passive: true });
+  document.addEventListener("touchend", function () {
+    if (touch && Date.now() - touch.t < 350) post({ type: "tap" });
+    touch = null;
+  }, { passive: true });
   var size = { cols: 80, rows: 24 };
 
   // View mode: the terminal keeps its own size, scaled to the screen width.
@@ -72,9 +111,13 @@
     receive: function (msg) {
       if (msg.type === "write") {
         var data = bytes(msg.data);
-        term.write(data, function () { post({ type: "written", bytes: data.length }); });
+        term.write(data, function () {
+          post({ type: "written", bytes: data.length });
+          checkModes();
+        });
       } else if (msg.type === "reset") {
         term.reset();
+        checkModes();
       } else if (msg.type === "mode") {
         mode = msg.mode;
         document.body.className = mode;
