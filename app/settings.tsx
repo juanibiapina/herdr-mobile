@@ -1,4 +1,6 @@
 import Constants from "expo-constants";
+import { useState } from "react";
+import { applyUpdate, currentUpdate, fetchUpdate, updatesEnabled } from "../src/updates";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { updateSettings, useSettings, type Settings } from "../src/settings";
 import { colors } from "../src/ui/theme";
@@ -78,7 +80,18 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <Text style={styles.footer}>Herdr Mobile {Constants.expoConfig?.version} · a client for herdr-core</Text>
+      <Text style={styles.section}>App</Text>
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Text style={styles.label}>Herdr Mobile {Constants.expoConfig?.version}</Text>
+            <Text style={styles.hint}>{currentUpdate()}</Text>
+          </View>
+          {updatesEnabled && <UpdateButton />}
+        </View>
+      </View>
+
+      <Text style={styles.footer}>A client for herdr-core</Text>
     </ScrollView>
   );
 }
@@ -92,6 +105,25 @@ function Toggle({ k, label, hint, s, border }: { k: keyof Settings; label: strin
       </View>
       <Switch value={!!s[k]} onValueChange={(v) => void updateSettings({ [k]: v })} />
     </View>
+  );
+}
+
+function UpdateButton() {
+  const [state, setState] = useState<"idle" | "checking" | "ready" | "latest" | "failed">("idle");
+  const label = { idle: "Check for updates", checking: "Checking…", ready: "Restart to update", latest: "Up to date", failed: "Couldn't check" }[state];
+  const onPress = async () => {
+    if (state === "ready") return void applyUpdate();
+    setState("checking");
+    try {
+      setState((await fetchUpdate()) ? "ready" : "latest");
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <Pressable style={[styles.step, state === "ready" && styles.segActive]} onPress={() => void onPress()} disabled={state === "checking"}>
+      <Text style={[styles.stepText, state === "ready" && styles.segTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 

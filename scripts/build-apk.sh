@@ -22,8 +22,19 @@ grep -q '^kotlin.compiler.execution.strategy' "$props" || echo 'kotlin.compiler.
 grep -q '^org.gradle.workers.max' "$props" || echo 'org.gradle.workers.max=1' >>"$props"
 
 export NIXPKGS_ACCEPT_ANDROID_SDK_LICENSE=1
+# expo-updates' fingerprint task declares no file inputs, so Gradle would keep
+# a stale runtime version after a native change; always rerun it.
 nix develop "${DOTFILES:-$HOME/workspace/juanibiapina/dotfiles}#android" --command bash -c \
-  'cd android && ./gradlew :app:assembleRelease --no-daemon'
+  'cd android && ./gradlew :app:createReleaseUpdatesResources --rerun :app:assembleRelease --no-daemon'
 
 cp android/app/build/outputs/apk/release/app-release.apk herdr-mobile.apk
-echo "built $(pwd)/herdr-mobile.apk"
+
+# An APK whose runtime version differs from what `eas update` publishes for
+# never receives updates. Refuse to hand one out.
+built=$(unzip -p herdr-mobile.apk assets/fingerprint 2>/dev/null || python3 -c "import zipfile; print(zipfile.ZipFile('herdr-mobile.apk').read('assets/fingerprint').decode())")
+expected=$(pnpm exec expo-updates runtimeversion:resolve --platform android 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).runtimeVersion))')
+if [ "$built" != "$expected" ]; then
+  echo "runtime version mismatch: APK has $built, updates publish for $expected" >&2
+  exit 1
+fi
+echo "built $(pwd)/herdr-mobile.apk (runtime $built)"

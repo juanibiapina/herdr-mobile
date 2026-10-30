@@ -14,6 +14,10 @@
         "INTERNET",
         "POST_NOTIFICATIONS",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE",
+        "INTERNET",
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_SPECIAL_USE"
       ],
       "versionCode": 2,
@@ -46,6 +50,23 @@
     "experiments": {
       "typedRoutes": false
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "owner": "juanibiapina",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0afbcfa9-0226-496f-a345-cd321643342c"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0afbcfa9-0226-496f-a345-cd321643342c",
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
+    },
+    "ios": {},
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    }
   }
 }

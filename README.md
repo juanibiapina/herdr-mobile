@@ -52,15 +52,34 @@ Layout:
 - `src/terminal/`: xterm.js in a WebView, fed by hc's attach stream.
 - `app/`: screens (Expo Router).
 
-## Build
+## Release
+
+There are two paths. Pick by what changed.
+
+**Code change (TypeScript, UI, assets): publish an update.** Installed apps
+download it on their next launch, or when they come back to the foreground,
+and offer "Restart" on the Agents screen.
 
 ```sh
-./scripts/build-apk.sh    # standalone arm64 release APK → herdr-mobile.apk
+pnpm run publish:update -- --message "what changed"
+```
+
+It goes to the EAS `preview` channel, which the APK is built to follow.
+
+**Native change: build a new APK.** Native means the Kotlin module in
+`modules/`, a native dependency, or `app.json`. The runtime version is a
+fingerprint of the native inputs, so an update can never load on an APK built
+from different native code. `npx expo-updates runtimeversion:resolve
+--platform android` prints the current fingerprint; when it differs from the
+installed APK's (Settings shows which code is running), build a new APK.
+
+```sh
+./scripts/build-apk.sh          # standalone arm64 release APK → herdr-mobile.apk
+PREBUILD=1 ./scripts/build-apk.sh   # after changing app.json or native dependencies
 adb install -r herdr-mobile.apk
 ```
 
 The script expects a NixOS box with the Android dev shell from
 `juanibiapina/dotfiles` (`nix develop ~/workspace/juanibiapina/dotfiles#android`).
-It limits Gradle to one worker and one JVM for low-memory machines, and reuses
-`android/` between builds; run it with `PREBUILD=1` after changing `app.json`
-or a native dependency. The release build is signed with the debug key.
+It limits Gradle to one worker and one JVM for low-memory machines. The release
+build is signed with the debug key.
