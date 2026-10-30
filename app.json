@@ -7,6 +7,13 @@
     "orientation": "default",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0d1117",
+    "ios": {
+      "bundleIdentifier": "dev.juanibiapina.herdrmobile",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
     "android": {
       "package": "dev.juanibiapina.herdrmobile",
       "softwareKeyboardLayoutMode": "resize",
@@ -30,6 +37,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-ios-scene.js",
       [
         "expo-build-properties",
         {
@@ -64,7 +72,6 @@
         "expo-channel-name": "preview"
       }
     },
-    "ios": {},
     "runtimeVersion": {
       "policy": "fingerprint"
     }
