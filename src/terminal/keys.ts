@@ -6,6 +6,23 @@ export type KeyName =
   | "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"
   | "ctrl+c" | "ctrl+d" | "ctrl+r" | "ctrl+z" | "ctrl+l";
 
+/** The key bar, in order. "paste" is the clipboard; single characters type themselves. */
+export const KEY_BAR: { label: string; key: string }[] = [
+  { label: "esc", key: "esc" },
+  { label: "tab", key: "tab" },
+  { label: "⇧tab", key: "shift+tab" },
+  { label: "←", key: "left" },
+  { label: "↓", key: "down" },
+  { label: "↑", key: "up" },
+  { label: "→", key: "right" },
+  { label: "⏎", key: "enter" },
+  { label: "^C", key: "ctrl+c" },
+  { label: "paste", key: "paste" },
+  { label: "1", key: "1" },
+  { label: "2", key: "2" },
+  { label: "3", key: "3" },
+];
+
 const ARROWS: Record<string, string> = { up: "A", down: "B", right: "C", left: "D", home: "H", end: "F" };
 
 export function keyBytes(key: KeyName | string, appCursor: boolean): string {

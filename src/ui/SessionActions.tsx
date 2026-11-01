@@ -7,9 +7,11 @@ import { herdrLabels } from "../herdr-app";
 import type { Session } from "../hc/fleet";
 import { ago, sessionTitle, shortPath } from "./session-display";
 import { Sheet, SheetAction } from "./Sheet";
-import { colors } from "./theme";
+import type { ReactNode } from "react";
+import { colors, fonts, space } from "./theme";
 
-export function SessionActions({ session, onClose }: { session: Session | null; onClose: () => void }) {
+/** children: actions the current screen adds, shown first. */
+export function SessionActions({ session, onClose, children }: { session: Session | null; onClose: () => void; children?: ReactNode }) {
   const t = session?.terminal;
   const live = t?.state === "live";
 
@@ -47,6 +49,7 @@ export function SessionActions({ session, onClose }: { session: Session | null; 
               {t.foreground?.name ? ` · now ${t.foreground.name}` : ""}
             </Text>
           </View>
+          {children}
           {live && (
             <SheetAction
               label="Interrupt"
@@ -117,7 +120,7 @@ export function SessionActions({ session, onClose }: { session: Session | null; 
 }
 
 const styles = StyleSheet.create({
-  head: { paddingHorizontal: 14, paddingBottom: 10, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginBottom: 4 },
+  head: { paddingHorizontal: 14, paddingBottom: space.md - 2, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginBottom: 4 },
   title: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  meta: { color: colors.muted, fontSize: 13, fontFamily: "monospace" },
+  meta: { color: colors.muted, fontSize: 13, fontFamily: fonts.mono },
 });

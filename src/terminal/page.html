@@ -58,21 +58,102 @@
     }
   }
 
-  // A tap (not a scroll or a long press) asks for the keyboard.
-  var touch = null;
-  document.addEventListener("touchstart", function (e) {
+  // One finger: a tap asks for the keyboard; dragging up or down scrolls, with a
+  // fling. The normal screen scrolls its history. A full-screen program scrolls
+  // itself: mouse wheel when it asked for the mouse, arrow keys otherwise.
+  // Pinch zoom and panning a zoomed page stay with the WebView.
+  var touch = null, acc = 0, lastY = 0, lastT = 0, velocity = 0, flingTimer = null;
+
+  function rowHeight() {
+    var row = el.querySelector(".xterm-rows > div");
+    var h = row ? row.getBoundingClientRect().height : 0;
+    return h > 2 ? h : 14;
+  }
+
+  function wheel(up) {
+    var b = up ? 64 : 65;
+    var col = Math.ceil(term.cols / 2), row = Math.ceil(term.rows / 2);
+    var mouse = term._core && term._core.coreMouseService;
+    var enc = mouse && mouse.activeEncoding;
+    if (enc === "SGR" || enc === "SGR_PIXELS") return "\x1b[<" + b + ";" + col + ";" + row + "M";
+    return "\x1b[M" + String.fromCharCode(32 + b, 32 + Math.min(col, 223), 32 + Math.min(row, 223));
+  }
+
+  function selfScrolls() {
+    return term.buffer.active.type === "alternate";
+  }
+
+  // lines > 0: toward older output (the finger moves down).
+  function scrollBy(lines) {
+    if (!lines) return;
+    if (!selfScrolls()) { term.scrollLines(-lines); return; }
+    var mouse = term.modes.mouseTrackingMode !== "none";
+    var up = lines > 0, out = "";
+    for (var i = 0; i < Math.min(Math.abs(lines), 30); i++) {
+      out += mouse ? wheel(up) : (appCursor ? "\x1bO" : "\x1b[") + (up ? "A" : "B");
+    }
+    post({ type: "input", data: out });
+  }
+
+  function step(dy) {
+    acc += dy;
+    var h = rowHeight(), lines = acc > 0 ? Math.floor(acc / h) : Math.ceil(acc / h);
+    if (lines) { acc -= lines * h; scrollBy(lines); }
+  }
+
+  function stopFling() {
+    if (flingTimer) { clearInterval(flingTimer); flingTimer = null; }
+  }
+
+  function fling(v) {
+    stopFling();
+    // Arrow keys would land as a burst of keystrokes: no fling for those.
+    if (selfScrolls() && term.modes.mouseTrackingMode === "none") return;
+    flingTimer = setInterval(function () {
+      v *= 0.94;
+      if (Math.abs(v) < 0.05) return stopFling();
+      step(v * 16);
+    }, 16);
+  }
+
+  window.addEventListener("touchstart", function (e) {
+    stopFling();
     if (e.touches.length !== 1) { touch = null; return; }
-    touch = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
-  }, { passive: true });
-  document.addEventListener("touchmove", function (e) {
+    var p = e.touches[0];
+    touch = { x: p.clientX, y: p.clientY, t: Date.now(), moved: false, scrolling: false };
+    acc = 0; velocity = 0; lastY = p.clientY; lastT = Date.now();
+  }, { passive: true, capture: true });
+
+  window.addEventListener("touchmove", function (e) {
     if (!touch) return;
-    var dx = e.touches[0].clientX - touch.x, dy = e.touches[0].clientY - touch.y;
-    if (dx * dx + dy * dy > 100) touch = null;
-  }, { passive: true });
-  document.addEventListener("touchend", function () {
-    if (touch && Date.now() - touch.t < 350) post({ type: "tap" });
+    if (e.touches.length !== 1) { touch = null; return; }
+    var p = e.touches[0], dx = p.clientX - touch.x, dy = p.clientY - touch.y;
+    if (!touch.moved && dx * dx + dy * dy > 100) {
+      touch.moved = true;
+      var zoomed = window.visualViewport && window.visualViewport.scale > 1.01;
+      touch.scrolling = Math.abs(dy) > Math.abs(dx) && !zoomed;
+      lastY = p.clientY; lastT = Date.now();
+    }
+    if (!touch.scrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var now = Date.now(), d = p.clientY - lastY;
+    velocity = d / Math.max(1, now - lastT);
+    lastY = p.clientY; lastT = now;
+    step(d);
+  }, { passive: false, capture: true });
+
+  window.addEventListener("touchend", function (e) {
+    if (!touch) return;
+    if (!touch.moved && Date.now() - touch.t < 350) post({ type: "tap" });
+    else if (touch.scrolling) {
+      e.stopPropagation();
+      if (Math.abs(velocity) > 0.3 && Date.now() - lastT < 80) fling(velocity);
+    }
     touch = null;
-  }, { passive: true });
+  }, { passive: true, capture: true });
+
+  window.addEventListener("touchcancel", function () { touch = null; }, { passive: true, capture: true });
   var size = { cols: 80, rows: 24 };
 
   // View mode: the terminal keeps its own size, scaled to the screen width.

@@ -1,6 +1,12 @@
-// What went wrong reaching a machine, and what to do about it.
-import type { MachineConfig } from "../hc/fleet";
+// How a machine's connection reads: its color, and what went wrong reaching it.
+import type { LinkView, MachineConfig } from "../hc/fleet";
+import { colors } from "./theme";
 
+export function linkColor(state: LinkView["state"]): string {
+  return state === "connected" ? colors.done : state === "connecting" ? colors.working : colors.blocked;
+}
+
+/** What went wrong reaching a machine, and what to do about it. */
 export function explainError(raw: string | undefined, m: MachineConfig): string | undefined {
   if (!raw) return raw;
   const r = raw.toLowerCase();

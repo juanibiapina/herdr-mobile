@@ -53,7 +53,7 @@ export type Section = { id: string; title: string; color: string; sessions: Sess
 /** The program's own name for itself (claude, pi), else what runs in it. */
 export function appName(s: Session): string {
   const t = s.terminal;
-  return t.status?.app || t.template || t.foreground?.name || t.argv[0] || "shell";
+  return t.status?.app || t.template || t.foreground?.name || t.argv[0]?.split("/").pop() || "shell";
 }
 
 /** The folder's last part: the project. */

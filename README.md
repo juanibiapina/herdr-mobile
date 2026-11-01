@@ -8,11 +8,13 @@ An Android and iOS client for [herdr-core](https://github.com/herdrdev/herdr-cor
 - **Switching:** inside a session, a strip of every session across the top,
   a "waiting" button that jumps to the next agent waiting on you, and the full
   list from the title.
-- **Terminal:** live, in color, at phone size or your desktop's size. Tap it
-  and type: keys go straight to the terminal, exactly as pressed (no
+- **Terminal:** live, in color, at phone size or your desktop's size (switch
+  in the ⋯ menu). Swipe to scroll its history, or a full-screen program. Tap
+  it and type: keys go straight to the terminal, exactly as pressed (no
   autocorrect, unless you pick the standard keyboard in Settings). The key bar
   sends esc, tab, arrows, ctrl combinations and the clipboard instantly.
-  Message mode is for prose to agents: hc pastes it and presses Enter.
+  Message mode is for prose to agents: Enter sends it, and hc pastes it and
+  presses Enter.
 - **Start sessions:** pick a machine (also one reached through another), browse
   to a folder, and start a shell, an installed agent (Claude Code, pi, Codex, …),
   a template, or any command, with an optional first task.
@@ -25,7 +27,7 @@ An Android and iOS client for [herdr-core](https://github.com/herdrdev/herdr-cor
 The phone reaches each machine the way hc reaches a machine it adds: SSH, then
 `herdr-core connect`, which speaks the hc API over stdin/stdout. Nothing new
 runs on your machines. The phone makes its own Ed25519 key; add its public key
-(Machines screen → Copy) to `~/.ssh/authorized_keys` on each machine. The first
+(Settings → Machines → Copy) to `~/.ssh/authorized_keys` on each machine. The first
 host key a machine presents is trusted and pinned.
 
 The phone connects to every machine you add and merges their lists. A machine
