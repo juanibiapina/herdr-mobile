@@ -1,6 +1,6 @@
 // Keeps the phone's copy of the definition in step with the definition
 // machine's home (~/.config/herdr-mobile, or $XDG_CONFIG_HOME/herdr-mobile).
-// herdr-core has no file events, so the caller polls: once a second while
+// herdr-core has no file events, so the caller polls: every few seconds while
 // the app is in front. Each poll lists checksums and reads only what changed.
 import { toBase64 } from "../hc/bytes";
 import { isDefinitionPath } from "./definition";
