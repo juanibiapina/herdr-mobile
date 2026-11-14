@@ -37,7 +37,7 @@ Tap an agent to open its terminal.
 
 The app draws its screens with mods: small JavaScript programs in `~/.config/herdr-mobile` on one of your machines.
 Ask an agent there to change them. Copy the agent prompt from Settings → Definition to start.
-Your phone shows the change within a second.
+Your phone shows the change within a few seconds.
 If something goes wrong, Settings → Definition → Reset layout brings back the shipped screens.
 
 ## Updates

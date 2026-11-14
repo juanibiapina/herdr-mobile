@@ -53,6 +53,11 @@ let sync: DefinitionSync | null = null;
 let syncedCore: string | null = null;
 let started = false;
 
+const POLL_MS = 3000;
+
+type Poller = { timer?: ReturnType<typeof setInterval>; appState?: { remove(): void } };
+const poller: Poller = ((globalThis as { __herdrDefinitionPoller?: Poller }).__herdrDefinitionPoller ??= {});
+
 /** The definition machine's link: the one chosen in Settings, else the first. */
 export function definitionLink(): string | null {
   const links = fleet.snapshot().links;
@@ -149,14 +154,24 @@ async function poll() {
   } catch {}
 }
 
-/** Starts syncing; call once at app start. */
+function schedule(active: boolean) {
+  clearInterval(poller.timer);
+  poller.timer = undefined;
+  if (!active) return;
+  void poll();
+  poller.timer = setInterval(() => void poll(), POLL_MS);
+}
+
+/** Starts syncing; call once at app start. Polls every few seconds, only while the app is in front. */
 export function startDefinition() {
   if (started) return;
   started = true;
   definition.subscribe(() => void writeErrors());
   fleet.subscribe(() => check());
   onSettings(() => check());
-  setInterval(() => void poll(), 500);
+  poller.appState?.remove();
+  poller.appState = AppState.addEventListener("change", (state) => schedule(state === "active"));
+  schedule(AppState.currentState === "active");
   check();
 }
 

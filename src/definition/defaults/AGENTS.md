@@ -6,7 +6,7 @@ This folder is **Herdr Mobile's whole interface, as files**. Herdr Mobile is a
 phone app for the terminals and coding agents that herdr-core (`hc`) runs on
 the person's machines. The phone reads this folder from this machine (its
 *definition machine*) and redraws itself from it while it runs: change a
-layout or a mod here and the phone follows within a second, if the app is
+layout or a mod here and the phone follows within a few seconds, if the app is
 open. When the person asks for something on their phone ("a tab with my
 PRs", "show the branch under each space", "move search to the bottom"), you
 do it by editing these files. The shipped screens (Spaces, Agents, a space's
