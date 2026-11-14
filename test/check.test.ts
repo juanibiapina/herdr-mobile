@@ -1,14 +1,18 @@
 // check.mjs as agents run it: `node check.mjs` in a home written from the
 // shipped definition, then broken in the ways agents break things.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { expect, test } from "vitest";
+import { afterAll, expect, test } from "vitest";
 import { DEFAULT_FILES } from "../src/definition/defaults.generated";
+
+const homes: string[] = [];
+afterAll(() => homes.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
 
 function home(changes: Record<string, string | null> = {}) {
   const dir = mkdtempSync(join(tmpdir(), "hm-home-"));
+  homes.push(dir);
   const files: Record<string, string | null> = { ...DEFAULT_FILES, ...changes };
   for (const [path, text] of Object.entries(files)) {
     if (text === null) continue;

@@ -2,10 +2,10 @@
 // (modules/mod-engine/cpp, built for this computer and driven through me_cli)
 // and the WebAssembly one Node uses (src/mods/engine-wasm.ts). Same cases, same results.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { wasmEngine } from "../src/mods/engine-wasm";
 
 const cpp = join(__dirname, "../modules/mod-engine/cpp");
@@ -15,6 +15,7 @@ const cli = join(dir, "me_cli");
 beforeAll(() => {
   execFileSync("cc", ["-O1", "-DNDEBUG", "-D_GNU_SOURCE", "-o", cli, join(cpp, "me_cli.c"), join(cpp, "mod_engine.c"), join(cpp, "quickjs/quickjs-amalgam.c"), "-lm", "-lpthread"]);
 }, 240_000);
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 // The smallest runtime: __dispatch calls a named function with parsed args,
 // host calls go to the outbox as promises that "resolve" settles.
