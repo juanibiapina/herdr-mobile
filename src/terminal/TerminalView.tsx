@@ -2,7 +2,7 @@
 // only after xterm has drawn them, so a slow phone gets a repaint instead of
 // an endless backlog.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { toBase64, utf8Encode } from "../hc/bytes";
 import type { AttachStream, HcConnection } from "../hc/connection";
@@ -153,6 +153,7 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(function TerminalV
       bracketed.current = !!msg.bracketedPaste;
     }
     else if (msg.type === "tap") onTap?.();
+    else if (msg.type === "link") Linking.openURL(msg.url).catch(() => {});
     else if (msg.type === "back") onSwipeBack?.();
     else if (msg.type === "input") stream.current?.write(utf8Encode(msg.data));
     else if (msg.type === "size") {

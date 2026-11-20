@@ -29,6 +29,9 @@
     cursorBlink: false,
     allowProposedApi: true,
     theme: { background: "#0d1117", foreground: "#e6edf3", cursor: "#e6edf3" },
+    // A tap opens links (linkAt below); xterm's own handler would confirm() and
+    // window.open, which WKWebView ignores.
+    linkHandler: { activate: function () {} },
   });
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
@@ -161,9 +164,66 @@
     step(d);
   }, { passive: false, capture: true });
 
+  // URLs in terminal text: the scheme part of Ghostty's link pattern, as herdr-app uses.
+  var URL_PATTERN = new RegExp(
+    "(?:https?://|mailto:|ftp://|file:|ssh:|git://|ssh://|tel:|magnet:|ipfs://|ipns://|gemini://|gopher://|news:|cursor://|vscode://)" +
+    "(?:(?:\\[[:0-9a-fA-F]+(?:[:0-9a-fA-F]*)+\\](?::[0-9]+)?)|[\\w\\-.~:/?#@!$&*+,;=%]+(?:[\\(\\[]\\w*[\\)\\]])?)+(?<![,.])",
+    "g"
+  );
+
+  // The link under a point on the screen: an OSC 8 hyperlink, or a URL in the text.
+  function linkAt(x, y) {
+    var screen = el.querySelector(".xterm-screen");
+    if (!screen) return null;
+    var r = screen.getBoundingClientRect();
+    if (x < r.left || y < r.top || x >= r.right || y >= r.bottom) return null;
+    var col = Math.floor((x - r.left) / r.width * term.cols);
+    var buf = term.buffer.active;
+    var row = buf.viewportY + Math.floor((y - r.top) / r.height * term.rows);
+    var line = buf.getLine(row);
+    if (!line) return null;
+
+    var cell = line.getCell(col);
+    var urlId = cell && cell.extended && cell.extended.urlId;
+    if (urlId) {
+      try {
+        var uri = term._core._oscLinkService.getLinkData(urlId).uri;
+        if (uri) return uri;
+      } catch (err) {}
+    }
+
+    // The whole wrapped line, and where the tapped cell falls in its text.
+    var first = row, last = row;
+    while (first > 0 && buf.getLine(first).isWrapped) first--;
+    while (buf.getLine(last + 1) && buf.getLine(last + 1).isWrapped) last++;
+    var text = "", at = -1;
+    for (var y2 = first; y2 <= last; y2++) {
+      var l = buf.getLine(y2);
+      for (var x2 = 0; x2 < l.length; x2++) {
+        var c = l.getCell(x2);
+        if (!c) continue;
+        // A wide character's second cell belongs to the character before it.
+        if (y2 === row && x2 === col) at = c.getWidth() === 0 ? text.length - 1 : text.length;
+        if (c.getWidth() === 0) continue;
+        text += c.getChars() || " ";
+      }
+    }
+    if (at < 0) return null;
+    URL_PATTERN.lastIndex = 0;
+    var m;
+    while ((m = URL_PATTERN.exec(text))) {
+      if (m.index > at) break;
+      if (at < m.index + m[0].length) return m[0];
+    }
+    return null;
+  }
+
   window.addEventListener("touchend", function (e) {
     if (!touch) return;
-    if (!touch.moved && Date.now() - touch.t < 350) post({ type: "tap" });
+    if (!touch.moved && Date.now() - touch.t < 350) {
+      var url = linkAt(touch.x, touch.y);
+      post(url ? { type: "link", url: url } : { type: "tap" });
+    }
     else if (!touch.scrolling && !touch.zoomed && touch.dx > 80 && Math.abs(touch.dx) > 2 * Math.abs(touch.dy)) post({ type: "back" });
     else if (touch.scrolling) {
       e.stopPropagation();
