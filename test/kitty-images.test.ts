@@ -50,7 +50,7 @@ beforeAll(() => {
   ImageAddonCtor = loadPageScript(scripts[2]).ImageAddon as typeof ImageAddonCtor;
 });
 
-function setup() {
+async function uploaded() {
   const term = new TerminalCtor({ cols: 20, rows: 10, allowProposedApi: true });
   const addon = new ImageAddonCtor();
   term.loadAddon(addon);
@@ -58,14 +58,9 @@ function setup() {
   term.onData((d) => replies.push(d));
   const write = (data: string) => new Promise<void>((resolve) => term.write(data, resolve));
   const shown = () => addon.getImageAtBufferCell(0, 0) !== undefined;
+  await write(kitty(`a=T,f=100,q=2,C=1,c=4,r=2,i=${ID}`, PNG));
+  expect(shown()).toBe(true);
   return { write, shown, replies };
-}
-
-async function uploaded() {
-  const t = setup();
-  await t.write(kitty(`a=T,f=100,q=2,C=1,c=4,r=2,i=${ID}`, PNG));
-  expect(t.shown()).toBe(true);
-  return t;
 }
 
 describe("Kitty image deletes", () => {
